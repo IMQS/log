@@ -8,12 +8,14 @@ Usage
 
 Create a new logger using log.New(filename).
 You can write to it using the various logging methods.
+'filename' may also be log.Stdout or log.Stderr, in which case we do the obvious thing.
 */
 package log
 
 import (
 	"fmt"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"os"
 	"time"
 )
 
@@ -26,6 +28,9 @@ const (
 	Warn
 	Error
 )
+
+const Stdout = "stdout"
+const Stderr = "stderr"
 
 // ISO 8601, with 6 digits of time precision
 const timeFormat = "2006-01-02T15:04:05.000000Z07:00"
@@ -53,6 +58,7 @@ type Logger struct {
 	shownError bool
 }
 
+// Create a new logger. Filename may also be one of the special names log.Stdout and log.Stderr
 func New(filename string) *Logger {
 	l := &Logger{
 		Level: Info,
@@ -116,10 +122,16 @@ func (l *Logger) Log(level Level, msg string) {
 			suffix = "\n"
 		}
 		s := fmt.Sprintf("%v [%v] %v%v", time.Now().Format(timeFormat), levelToName(level)[0:1], msg, suffix)
-		_, err := l.lj.Write([]byte(s))
-		if err != nil && !l.shownError {
-			l.shownError = true
-			fmt.Printf("Unable to write to log file %v: %v. This error will not be shown again.\n", l.lj.Filename, err)
+		if l.lj.Filename == Stdout {
+			os.Stdout.Write([]byte(s))
+		} else if l.lj.Filename == Stderr {
+			os.Stderr.Write([]byte(s))
+		} else {
+			_, err := l.lj.Write([]byte(s))
+			if err != nil && !l.shownError {
+				l.shownError = true
+				fmt.Printf("Unable to write to log file %v: %v. This error will not be shown again.\n", l.lj.Filename, err)
+			}
 		}
 	}
 }
