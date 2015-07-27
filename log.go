@@ -33,7 +33,7 @@ const Stdout = "stdout"
 const Stderr = "stderr"
 
 // ISO 8601, with 6 digits of time precision
-const timeFormat = "2006-01-02T15:04:05.000000Z07:00"
+const timeFormat = "2006-01-02T15:04:05.000000Z0700"
 
 func levelToName(level Level) string {
 	switch level {
