@@ -69,6 +69,10 @@ func New(filename string) *Logger {
 	return l
 }
 
+func (l *Logger) Close() error {
+	return l.lj.Close()
+}
+
 func (l *Logger) Tracef(format string, params ...interface{}) {
 	l.Logf(Trace, format, params...)
 }
