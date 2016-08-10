@@ -9,6 +9,8 @@ Usage
 Create a new logger using log.New(filename).
 You can write to it using the various logging methods.
 'filename' may also be log.Stdout or log.Stderr, in which case we do the obvious thing.
+
+log.Logger implements io.Writer, so you can chain other logging systems behind this.
 */
 package log
 
@@ -73,6 +75,29 @@ func (l *Logger) Close() error {
 	return l.lj.Close()
 }
 
+// Parse a level string such as "info" or "warn". Only the first character of the string is considered.
+func ParseLevel(lev string) (Level, error) {
+	if len(lev) != 0 {
+		char0 := lev[0:1]
+		if char0 == "T" || char0 == "t" {
+			return Trace, nil
+		}
+		if char0 == "D" || char0 == "d" {
+			return Debug, nil
+		}
+		if char0 == "I" || char0 == "i" {
+			return Info, nil
+		}
+		if char0 == "W" || char0 == "w" {
+			return Warn, nil
+		}
+		if char0 == "E" || char0 == "e" {
+			return Error, nil
+		}
+	}
+	return Info, fmt.Errorf("Invalid log level '%v'", lev)
+}
+
 func (l *Logger) Tracef(format string, params ...interface{}) {
 	l.Logf(Trace, format, params...)
 }
@@ -126,16 +151,21 @@ func (l *Logger) Log(level Level, msg string) {
 			suffix = "\n"
 		}
 		s := fmt.Sprintf("%v [%v] %v%v", time.Now().Format(timeFormat), levelToName(level)[0:1], msg, suffix)
-		if l.lj.Filename == Stdout {
-			os.Stdout.Write([]byte(s))
-		} else if l.lj.Filename == Stderr {
-			os.Stderr.Write([]byte(s))
-		} else {
-			_, err := l.lj.Write([]byte(s))
-			if err != nil && !l.shownError {
-				l.shownError = true
-				fmt.Printf("Unable to write to log file %v: %v. This error will not be shown again.\n", l.lj.Filename, err)
-			}
+		l.Write([]byte(s))
+	}
+}
+
+func (l *Logger) Write(p []byte) (n int, err error) {
+	if l.lj.Filename == Stdout {
+		n, err = os.Stdout.Write(p)
+	} else if l.lj.Filename == Stderr {
+		n, err = os.Stderr.Write(p)
+	} else {
+		n, err = l.lj.Write(p)
+		if err != nil && !l.shownError {
+			l.shownError = true
+			fmt.Printf("Unable to write to log file %v: %v. This error will not be shown again.\n", l.lj.Filename, err)
 		}
 	}
+	return
 }
