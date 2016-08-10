@@ -10,7 +10,8 @@ Create a new logger using log.New(filename).
 You can write to it using the various logging methods.
 'filename' may also be log.Stdout or log.Stderr, in which case we do the obvious thing.
 
-log.Logger implements io.Writer, so you can chain other logging systems behind this.
+If you need to forward other log messages to this system, then Forwarder might have
+sufficient functionality to achieve that.
 */
 package log
 
@@ -168,4 +169,28 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 		}
 	}
 	return
+}
+
+// Forwards log messages to an existing Logger, while performing some sanitizing which
+// ensures that all log messages share the same format
+type Forwarder struct {
+	StripPrefixLen int     // Number of bytes of prefix to strip (typically the timestamp from the incoming log message)
+	Level          Level   // The log level assigned to all messages from this source
+	Target         *Logger // The destination
+}
+
+// Create a new log forwarder
+func NewForwarder(stripPrefixLen int, level Level, target *Logger) *Forwarder {
+	return &Forwarder{
+		StripPrefixLen: stripPrefixLen,
+		Level:          level,
+		Target:         target,
+	}
+}
+
+func (f *Forwarder) Write(p []byte) (n int, err error) {
+	if len(p) > f.StripPrefixLen {
+		f.Target.Log(f.Level, string(p[f.StripPrefixLen:]))
+	}
+	return len(p), nil
 }
