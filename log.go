@@ -22,6 +22,9 @@ import (
 
 	"github.com/heroku/rollbar"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"runtime"
+	"path"
+	"strings"
 )
 
 type Level int
@@ -80,6 +83,14 @@ type Logger struct {
 	useRollbar bool // Log messages to Rollbar
 }
 
+type CallInfo struct {
+	packageName 	string
+	fileName 		string
+	funcName 		string
+	line 			int
+}
+
+
 // Create a new logger. Filename may also be one of the special names log.Stdout and log.Stderr
 func New(filename string) *Logger {
 	l := &Logger{
@@ -111,6 +122,29 @@ func (l *Logger) SendRollbarMessage(level Level, message string) {
 
 func (l *Logger) Close() error {
 	return l.lj.Close()
+}
+
+func retrieveCallInfo() *CallInfo {
+	pc, file, line, _ := runtime.Caller(4)
+	_, fileName := path.Split(file)
+	parts := strings.Split(runtime.FuncForPC(pc).Name(), ".")
+	pl := len(parts)
+	packageName := ""
+	funcName := parts[pl-1]
+
+	if parts[pl-2][0] == '(' {
+		funcName = parts[pl-2] + "." + funcName
+		packageName = strings.Join(parts[0:pl-2], ".")
+	} else {
+		packageName = strings.Join(parts[0:pl-1], ".")
+	}
+
+	return &CallInfo{
+		packageName: packageName,
+		fileName:    fileName,
+		funcName:    funcName,
+		line:        line,
+	}
 }
 
 // Parse a level string such as "info" or "warn". Only the first character of the string is considered.
@@ -188,7 +222,9 @@ func (l *Logger) Log(level Level, msg string) {
 		if len(msg) == 0 || msg[len(msg)-1] != '\n' {
 			suffix = "\n"
 		}
-		s := fmt.Sprintf("%v [%v] %v%v", time.Now().Format(timeFormat), levelToName(level)[0:1], msg, suffix)
+		var callInfo = retrieveCallInfo()
+		var packageInfo = callInfo.fileName + " : " + callInfo.funcName + "()"
+		s := fmt.Sprintf("%v [%v] %v %v%v", time.Now().Format(timeFormat), levelToName(level)[0:1], packageInfo,  msg, suffix)
 		l.Write([]byte(s))
 		l.SendRollbarMessage(level, msg)
 	}
