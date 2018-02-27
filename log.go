@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/heroku/rollbar"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"github.com/natefinch/lumberjack"
 )
 
 type Level int
