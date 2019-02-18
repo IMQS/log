@@ -20,7 +20,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/heroku/rollbar"
 	"github.com/natefinch/lumberjack"
 )
 
@@ -56,57 +55,22 @@ func levelToName(level Level) string {
 	panic("Unknown log level")
 }
 
-func levelToRollbarName(level Level) string {
-	switch level {
-	case Trace:
-		return "debug" // Rollbar does not have a Trace level, so setting to the lowest Rollbar level
-	case Debug:
-		return "debug"
-	case Info:
-		return "info"
-	case Warn:
-		return "warning"
-	case Error:
-		return "error"
-	}
-	panic("Unknown log level")
-}
-
 // A logger object. Use New() to construct one.
 type Logger struct {
 	Level      Level // Log messages with a level lower than this are discarded. Default level is Info
 	lj         lumberjack.Logger
 	shownError bool
-	useRollbar bool // Log messages to Rollbar
 }
 
 // Create a new logger. Filename may also be one of the special names log.Stdout and log.Stderr
 func New(filename string) *Logger {
 	l := &Logger{
-		Level:      Info,
-		useRollbar: false,
+		Level: Info,
 	}
 	l.lj.Filename = filename
 	l.lj.MaxSize = 30
 	l.lj.MaxBackups = 3
 	return l
-}
-
-// SetupRollbar sets up the Rollbar environment.
-// Rollbar is an improvement on the log scraper which sends messages to a online rollbar server.
-// The server then informs the relavent parties about the message via email immediately
-func (l *Logger) SetupRollbar(token, repository, version, environment string) {
-	rollbar.SetToken(token)
-	rollbar.SetEnvironment(environment)
-	rollbar.SetServerRoot(repository)
-	rollbar.SetCodeVersion(version)
-	l.useRollbar = true
-}
-
-func (l *Logger) SendRollbarMessage(level Level, message string) {
-	if l.useRollbar {
-		rollbar.Message(levelToRollbarName(level), message)
-	}
 }
 
 func (l *Logger) Close() error {
@@ -190,7 +154,6 @@ func (l *Logger) Log(level Level, msg string) {
 		}
 		s := fmt.Sprintf("%v [%v] %v%v", time.Now().Format(timeFormat), levelToName(level)[0:1], msg, suffix)
 		l.Write([]byte(s))
-		l.SendRollbarMessage(level, msg)
 	}
 }
 
