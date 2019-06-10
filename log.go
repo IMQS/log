@@ -60,12 +60,17 @@ type Logger struct {
 	Level      Level // Log messages with a level lower than this are discarded. Default level is Info
 	lj         lumberjack.Logger
 	shownError bool
+	docker 	   bool
 }
 
 // Create a new logger. Filename may also be one of the special names log.Stdout and log.Stderr
 func New(filename string) *Logger {
+	_, err := os.Stat("/.dockerenv")
+	isDocker := !os.IsNotExist(err)
+
 	l := &Logger{
 		Level: Info,
+		docker: isDocker,
 	}
 	l.lj.Filename = filename
 	l.lj.MaxSize = 30
@@ -163,6 +168,10 @@ func (l *Logger) Write(p []byte) (n int, err error) {
 	} else if l.lj.Filename == Stderr {
 		n, err = os.Stderr.Write(p)
 	} else {
+		if l.docker {
+			// we always log to stdout for docker
+			os.Stdout.Write(p)
+		}
 		n, err = l.lj.Write(p)
 		if err != nil && !l.shownError {
 			l.shownError = true
