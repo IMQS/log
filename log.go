@@ -18,6 +18,7 @@ package log
 import (
 	"fmt"
 	"os"
+	"testing"
 	"time"
 
 	"github.com/natefinch/lumberjack"
@@ -35,6 +36,7 @@ const (
 
 const Stdout = "stdout"
 const Stderr = "stderr"
+const Testing = ".testing."
 
 // ISO 8601, with 6 digits of time precision
 const timeFormat = "2006-01-02T15:04:05.000000Z0700"
@@ -58,9 +60,10 @@ func levelToName(level Level) string {
 // A logger object. Use New() to construct one.
 type Logger struct {
 	Level      Level // Log messages with a level lower than this are discarded. Default level is Info
+	testing    *testing.T
 	lj         lumberjack.Logger
 	shownError bool
-	docker 	   bool
+	docker     bool
 }
 
 // Create a new logger. Filename may also be one of the special names log.Stdout and log.Stderr
@@ -69,13 +72,21 @@ func New(filename string) *Logger {
 	isDocker := !os.IsNotExist(err)
 
 	l := &Logger{
-		Level: Info,
+		Level:  Info,
 		docker: isDocker,
 	}
 	l.lj.Filename = filename
 	l.lj.MaxSize = 30
 	l.lj.MaxBackups = 3
 	return l
+}
+
+// NewTesting creates a logger object that emits logs to the given Testing context
+func NewTesting(t *testing.T) *Logger {
+	return &Logger{
+		Level:   Info,
+		testing: t,
+	}
 }
 
 func (l *Logger) Close() error {
@@ -157,8 +168,12 @@ func (l *Logger) Log(level Level, msg string) {
 		if len(msg) == 0 || msg[len(msg)-1] != '\n' {
 			suffix = "\n"
 		}
-		s := fmt.Sprintf("%v [%v] %v%v", time.Now().Format(timeFormat), levelToName(level)[0:1], msg, suffix)
-		l.Write([]byte(s))
+		if l.testing != nil {
+			l.testing.Logf("[%v] %v", levelToName(level)[0:1], msg)
+		} else {
+			s := fmt.Sprintf("%v [%v] %v%v", time.Now().Format(timeFormat), levelToName(level)[0:1], msg, suffix)
+			l.Write([]byte(s))
+		}
 	}
 }
 
