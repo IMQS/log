@@ -17,6 +17,7 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -61,23 +62,41 @@ func levelToName(level Level) string {
 type Logger struct {
 	Level      Level // Log messages with a level lower than this are discarded. Default level is Info
 	testing    *testing.T
-	lj         lumberjack.Logger
+	filename   string
+	log        io.Writer
 	shownError bool
 	docker     bool
 }
 
 // Create a new logger. Filename may also be one of the special names log.Stdout and log.Stderr
-func New(filename string) *Logger {
+func New(filename string, logToStdout bool) *Logger {
 	_, err := os.Stat("/.dockerenv")
 	isDocker := !os.IsNotExist(err)
 
 	l := &Logger{
-		Level:  Info,
-		docker: isDocker,
+		Level:    Info,
+		filename: filename,
+		docker:   isDocker,
 	}
-	l.lj.Filename = filename
-	l.lj.MaxSize = 30
-	l.lj.MaxBackups = 3
+
+	if filename == Stdout {
+		l.log = io.Writer(os.Stdout)
+	} else if filename == Stderr {
+		l.log = io.Writer(os.Stderr)
+	} else {
+		lj := &lumberjack.Logger{
+			Filename:   filename,
+			MaxSize:    30,
+			MaxBackups: 3,
+		}
+		l.log = io.Writer(lj)
+	}
+
+	// We always log to stdout for docker
+	if (isDocker || logToStdout) && filename != Stdout {
+		l.log = io.MultiWriter(os.Stdout, l.log)
+	}
+
 	return l
 }
 
@@ -90,7 +109,8 @@ func NewTesting(t *testing.T) *Logger {
 }
 
 func (l *Logger) Close() error {
-	return l.lj.Close()
+	wc := l.log.(io.WriteCloser)
+	return wc.Close()
 }
 
 // Parse a level string such as "info" or "warn". Only the first character of the string is considered.
@@ -178,20 +198,10 @@ func (l *Logger) Log(level Level, msg string) {
 }
 
 func (l *Logger) Write(p []byte) (n int, err error) {
-	if l.lj.Filename == Stdout {
-		n, err = os.Stdout.Write(p)
-	} else if l.lj.Filename == Stderr {
-		n, err = os.Stderr.Write(p)
-	} else {
-		if l.docker {
-			// we always log to stdout for docker
-			os.Stdout.Write(p)
-		}
-		n, err = l.lj.Write(p)
-		if err != nil && !l.shownError {
-			l.shownError = true
-			fmt.Printf("Unable to write to log file %v: %v. This error will not be shown again.\n", l.lj.Filename, err)
-		}
+	n, err = l.log.Write(p)
+	if err != nil && !l.shownError {
+		l.shownError = true
+		fmt.Printf("Unable to write to log file %v: %v. This error will not be shown again.\n", l.filename, err)
 	}
 	return
 }
