@@ -68,7 +68,10 @@ type Logger struct {
 	docker     bool
 }
 
-// Create a new logger. Filename may also be one of the special names log.Stdout and log.Stderr
+// New creates a new logger. If logToStdout is true all logs will be written to
+// both the specified file and stdout. Filename may also be one of the special
+// names log.Stdout and log.Stderr. If log.Stdout is specified and logToStdout
+// is also set to true then the logs will only be written to stdout.
 func New(filename string, logToStdout bool) *Logger {
 	_, err := os.Stat("/.dockerenv")
 	isDocker := !os.IsNotExist(err)
