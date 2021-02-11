@@ -6,7 +6,7 @@ is a consistent log format, with predefined severity levels.
 
 Usage
 
-Create a new logger using log.New(filename).
+Create a new logger using log.New(filename, runtime.GOOS != "windows").
 You can write to it using the various logging methods.
 'filename' may also be log.Stdout or log.Stderr, in which case we do the obvious thing.
 
@@ -35,9 +35,11 @@ const (
 	Error
 )
 
-const Stdout = "stdout"
-const Stderr = "stderr"
-const Testing = ".testing."
+const (
+	Stdout  = "stdout"
+	Stderr  = "stderr"
+	Testing = ".testing."
+)
 
 // ISO 8601, with 6 digits of time precision
 const timeFormat = "2006-01-02T15:04:05.000000Z0700"
@@ -65,7 +67,7 @@ type Logger struct {
 	filename   string
 	log        io.Writer
 	shownError bool
-	docker     bool
+	inDocker   bool
 }
 
 // New creates a new logger. If logToStdout is true all logs will be written to
@@ -73,13 +75,12 @@ type Logger struct {
 // names log.Stdout and log.Stderr. If log.Stdout is specified and logToStdout
 // is also set to true then the logs will only be written to stdout.
 func New(filename string, logToStdout bool) *Logger {
-	_, err := os.Stat("/.dockerenv")
-	isDocker := !os.IsNotExist(err)
-
 	l := &Logger{
 		Level:    Info,
 		filename: filename,
-		docker:   isDocker,
+	}
+	if _, err := os.Stat("/.dockerenv"); !os.IsNotExist(err) {
+		l.inDocker = true
 	}
 
 	if filename == Stdout {
@@ -96,7 +97,7 @@ func New(filename string, logToStdout bool) *Logger {
 	}
 
 	// We always log to stdout for docker
-	if (isDocker || logToStdout) && filename != Stdout {
+	if (l.inDocker || logToStdout) && filename != Stdout {
 		l.log = io.MultiWriter(os.Stdout, l.log)
 	}
 
@@ -111,9 +112,15 @@ func NewTesting(t *testing.T) *Logger {
 	}
 }
 
+// Close attempts to close the connection
 func (l *Logger) Close() error {
-	wc := l.log.(io.WriteCloser)
-	return wc.Close()
+	if wc, ok := l.log.(io.WriteCloser); ok {
+		return wc.Close()
+	} else if s, ok := l.log.(*os.File); ok {
+		// Close connection to stdout/stderr
+		return s.Close()
+	}
+	return nil
 }
 
 // Parse a level string such as "info" or "warn". Only the first character of the string is considered.
