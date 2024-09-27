@@ -4,7 +4,7 @@ Package log is a standard logging system for IMQS Go applications.
 This is a very thin wrapper around lumberjack. What this package provides
 is a consistent log format, with predefined severity levels.
 
-Usage
+# Usage
 
 Create a new logger using log.New(filename, runtime.GOOS != "windows").
 You can write to it using the various logging methods.
@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/natefinch/lumberjack"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type Level int
