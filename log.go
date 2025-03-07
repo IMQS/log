@@ -44,6 +44,11 @@ const (
 // ISO 8601, with 6 digits of time precision
 const timeFormat = "2006-01-02T15:04:05.000000Z0700"
 
+// This variable is initialized the first time New is called and then returned
+// on every subsequent call. It can be used throughout an application by
+// just importing this package into any package
+var Log *Logger
+
 func levelToName(level Level) string {
 	switch level {
 	case Trace:
@@ -75,6 +80,9 @@ type Logger struct {
 // names log.Stdout and log.Stderr. If log.Stdout is specified and logToStdout
 // is also set to true then the logs will only be written to stdout.
 func New(filename string, logToStdout bool) *Logger {
+	if Log != nil {
+		return Log
+	}
 	l := &Logger{
 		Level:    Info,
 		filename: filename,
@@ -100,6 +108,8 @@ func New(filename string, logToStdout bool) *Logger {
 	if (l.inDocker || logToStdout) && filename != Stdout {
 		l.log = io.MultiWriter(os.Stdout, l.log)
 	}
+
+	Log = l
 
 	return l
 }
