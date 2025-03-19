@@ -116,10 +116,11 @@ func New(filename string, logToStdout bool) *Logger {
 
 // NewTesting creates a logger object that emits logs to the given Testing context
 func NewTesting(t *testing.T) *Logger {
-	return &Logger{
+	Log = &Logger{
 		Level:   Info,
 		testing: t,
 	}
+	return Log
 }
 
 // Close attempts to close the connection
